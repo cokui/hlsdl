@@ -353,7 +353,10 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     // while every single block of the audio stream is encrypted.
     int audio_index = -1, video_index = -1;
     static int audio_sample_rate = 0, audio_frame_size = 0;
-    get_info_for_sample_aes(buf, &audio_sample_rate, &audio_frame_size);
+
+    if (audio_sample_rate == 0) {
+        get_info_for_sample_aes(buf, &audio_sample_rate, &audio_frame_size);
+    }
 
     struct ByteBuffer input_buffer = {buf->data, buf->len, 0};
 
