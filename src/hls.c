@@ -289,6 +289,62 @@ void print_hls_master_playlist(struct hls_master_playlist *ma)
     }
 }
 
+static int get_info_for_sample_aes(struct ByteBuffer *buf, int *audio_sample_rate, int *audio_frame_size)
+{
+    // Insane hack to get the audio sample rate and frame size.
+    int audio_index = -1, video_index = -1;
+
+    struct ByteBuffer input_buffer = {buf->data, buf->len, 0};
+
+    AVInputFormat *ifmt = av_find_input_format("mpegts");
+    uint8_t *input_avbuff = av_malloc(4096);
+    AVIOContext *input_io_ctx = avio_alloc_context(input_avbuff, 4096, 0, &input_buffer,
+                                                   read_packet, NULL, seek);
+    AVFormatContext *ifmt_ctx = avformat_alloc_context();
+    ifmt_ctx->pb = input_io_ctx;
+
+    if (avformat_open_input(&ifmt_ctx, "file.h264", ifmt, NULL) != 0) {
+        MSG_ERROR("Opening input file failed\n");
+    }
+
+    // avformat_find_stream_info() throws useless warnings because the data is encrypted.
+    av_log_set_level(AV_LOG_QUIET);
+    avformat_find_stream_info(ifmt_ctx, NULL);
+    av_log_set_level(AV_LOG_WARNING);
+
+    for (int i = 0; i < (int)ifmt_ctx->nb_streams; i++) {
+        AVCodecContext *in_c = ifmt_ctx->streams[i]->codec;
+        if (in_c->codec_type == AVMEDIA_TYPE_AUDIO) {
+            audio_index = i;
+        } else if (in_c->codec_id == AV_CODEC_ID_H264) {
+            video_index = i;
+        }
+    }
+
+    if (video_index < 0 || audio_index < 0) {
+        MSG_ERROR("Video or Audio missing.");
+    }
+
+    AVPacket pkt;
+
+    while (av_read_frame(ifmt_ctx, &pkt) >= 0) {
+        if (pkt.stream_index == audio_index && *audio_sample_rate == 0) {
+            int idx = (pkt.data[2]) >> 2 & 0xF;
+            *audio_sample_rate = sample_rate_lookup[idx][1];
+            MSG_DBG("Detected Audio Sample Rate: %d\n", *audio_sample_rate);
+
+            *audio_frame_size = ((pkt.data[3] & 0b11) << 11) | (pkt.data[4] << 3) | (pkt.data[5] >> 5);
+            MSG_DBG("Detected Audio Frame Size: %d\n", *audio_frame_size);           
+        }
+        av_packet_unref(&pkt);
+    }
+    av_free(input_io_ctx->buffer);
+    av_free(input_io_ctx);
+    input_avbuff = NULL;
+    avformat_free_context(ifmt_ctx);
+    return 0;
+}
+
 static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *buf)
 {
     // SAMPLE AES works by encrypting small segments (blocks).
@@ -297,6 +353,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     // while every single block of the audio stream is encrypted.
     int audio_index = -1, video_index = -1;
     static int audio_sample_rate = 0, audio_frame_size = 0;
+    get_info_for_sample_aes(buf, &audio_sample_rate, &audio_frame_size);
 
     struct ByteBuffer input_buffer = {buf->data, buf->len, 0};
 
@@ -327,10 +384,6 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
             avformat_new_stream(ofmt_ctx, in_c->codec);
             avcodec_copy_context(ofmt_ctx->streams[i]->codec, in_c);
             audio_index = i;
-            if (s->sequence_number == 1) {
-                audio_frame_size = in_c->frame_size;
-                audio_sample_rate = in_c->sample_rate;
-            }
         } else if (in_c->codec_id == AV_CODEC_ID_H264) {
             avformat_new_stream(ofmt_ctx, in_c->codec);
             avcodec_copy_context(ofmt_ctx->streams[i]->codec, in_c);
@@ -338,19 +391,8 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
         }
     }
 
-    if (video_index < 0 || audio_index < 0) {
-        MSG_ERROR("Video or Audio missing.");
-    }
-
-
-    // It can happen that only the first segment contains
-    // useful sample_rate/frame_size data.
-    if (ofmt_ctx->streams[audio_index]->codec->sample_rate == 0) {
-        ofmt_ctx->streams[audio_index]->codec->sample_rate = audio_sample_rate;
-    }
-    if (ofmt_ctx->streams[audio_index]->codec->frame_size == 0) {
-        ofmt_ctx->streams[audio_index]->codec->frame_size = audio_frame_size;
-    }
+    ofmt_ctx->streams[audio_index]->codec->sample_rate = audio_sample_rate;
+    ofmt_ctx->streams[audio_index]->codec->frame_size = audio_frame_size;
 
     if (avio_open_dyn_buf(&ofmt_ctx->pb) != 0) {
         MSG_ERROR("Could not open output memory stream.\n");
@@ -404,9 +446,9 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
                 MSG_WARNING("Writing audio frame failed.\n");
             }
         } else if (pkt.stream_index == video_index) {
-            // av_read_frame() returns whole h264 frames. SAMPLE-AES
+            // av_return_frame returns whole h264 frames. SAMPLE-AES
             // encrypts NAL units instead of frames. Fortunatly, a frame
-            // contains multiple NAL units, so av_read_frame() can be used.
+            // contains multiple NAL units, so av_return_frame can be used.
             uint8_t *h264_frame = pkt.data;
             uint8_t *p = h264_frame;
             uint8_t *end = p + pkt.size;

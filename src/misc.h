@@ -42,6 +42,21 @@ static const uint8_t h264_scep_replace[4][3] =
                    {0x00, 0x00, 0x02},
                    {0x00, 0x00, 0x03}};
 
+static const int sample_rate_lookup[13][2] =
+                  {{0,  96000},
+                   {1,  88200},
+                   {2,  64000},
+                   {3,  48000},
+                   {4,  44100},
+                   {5,  32000},
+                   {6,  24000},
+                   {7,  22050},
+                   {8,  16000},
+                   {9,  12000},
+                   {10, 11025},
+                   {11,  8000},
+                   {12,  7350}};
+
 struct hls_args hls_args;
 
 int read_packet(void *opaque, uint8_t *buf, int buf_size);
