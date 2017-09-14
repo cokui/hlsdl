@@ -586,7 +586,7 @@ int download_hls(struct hls_media_playlist *me)
         }
     }
 
-    FILE *pFile = fopen(filename, "wb");
+    FILE *p_file = fopen(filename, "wb");
 
     for (int i = 0; i < me->count; i++) {
         MSG_PRINT("Downloading part %d\n", i);
@@ -597,10 +597,10 @@ int download_hls(struct hls_media_playlist *me)
         } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
             decrypt_sample_aes(&me->media_segment[i], &seg);
         }
-        fwrite(seg.data, 1, seg.len, pFile);
+        fwrite(seg.data, 1, seg.len, p_file);
         free(seg.data);
     }
-    fclose(pFile);
+    fclose(p_file);
     return 0;
 }
 
