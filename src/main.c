@@ -91,7 +91,7 @@ int main(int argc, const char * argv[])
     } else if (download_hls(&media_playlist)) {
         return 1;
     }
-    
+
     media_playlist_cleanup(&media_playlist);
     curl_global_cleanup();
     return 0;
