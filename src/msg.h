@@ -1,5 +1,5 @@
-#ifndef __HLS_DownLoad__msg__
-#define __HLS_DownLoad__msg__
+#ifndef __hlsdl__msg__
+#define __hlsdl__msg__
 
 #define LVL_ERROR 0x01
 #define LVL_WARNING 0x02
@@ -15,4 +15,4 @@
 
 int msg_print_va(int lvl, char *fmt, ...);
 
-#endif /* defined(__HLS_DownLoad__msg__) */
+#endif /* defined(__hlsdl__msg__) */

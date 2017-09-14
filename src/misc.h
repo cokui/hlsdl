@@ -1,5 +1,5 @@
-#ifndef __HLS_DownLoad__misc__
-#define __HLS_DownLoad__misc__
+#ifndef __hlsdl__misc__
+#define __hlsdl__misc__
 
 #include <stdint.h>
 
@@ -65,4 +65,4 @@ int bytes_remaining(uint8_t *pos, uint8_t *end);
 int str_to_bin(uint8_t *data, char *hexstring, int len);
 int parse_argv(int argc, const char *argv[]);
 
-#endif /* defined(__HLS_DownLoad__misc__) */
+#endif /* defined(__hlsdl__misc__) */

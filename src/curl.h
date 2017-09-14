@@ -1,5 +1,5 @@
-#ifndef __HLS_DownLoad__curl__
-#define __HLS_DownLoad__curl__
+#ifndef __hlsdl__curl__
+#define __hlsdl__curl__
 
 #define STRING 0x0001
 #define BINKEY 0x0002
@@ -12,4 +12,4 @@
 
 size_t get_data_from_url(char *url, char **str, uint8_t **bin, int type);
 
-#endif /* defined(__HLS_DownLoad__curl__) */
+#endif /* defined(__hlsdl__curl__) */

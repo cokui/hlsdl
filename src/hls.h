@@ -1,5 +1,5 @@
-#ifndef __HLS_DownLoad__hls__
-#define __HLS_DownLoad__hls__
+#ifndef __hlsdl__hls__
+#define __hlsdl__hls__
 
 #include <stdbool.h>
 
@@ -50,4 +50,4 @@ int print_enc_keys(struct hls_media_playlist *me);
 void print_hls_master_playlist(struct hls_master_playlist *ma);
 void media_playlist_cleanup(struct hls_media_playlist *me);
 void master_playlist_cleanup(struct hls_master_playlist *ma);
-#endif /* defined(__HLS_DownLoad__hls__) */
+#endif /* defined(__hlsdl__hls__) */
