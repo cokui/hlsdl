@@ -313,7 +313,7 @@ static int get_info_for_sample_aes(struct ByteBuffer *buf, int *audio_sample_rat
     av_log_set_level(AV_LOG_WARNING);
 
     for (int i = 0; i < (int)ifmt_ctx->nb_streams; i++) {
-        AVCodecContext *in_c = ifmt_ctx->streams[i]->codec;
+        AVCodecParameters *in_c = ifmt_ctx->streams[i]->codecpar;
         if (in_c->codec_type == AVMEDIA_TYPE_AUDIO) {
             audio_index = i;
         } else if (in_c->codec_id == AV_CODEC_ID_H264) {
@@ -382,19 +382,20 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     av_log_set_level(AV_LOG_WARNING);
 
     for (int i = 0; i < (int)ifmt_ctx->nb_streams; i++) {
-        AVCodecContext *in_c = ifmt_ctx->streams[i]->codec;
+        AVCodecParameters *in_c = ifmt_ctx->streams[i]->codecpar;
         if (in_c->codec_type == AVMEDIA_TYPE_AUDIO) {
-            avformat_new_stream(ofmt_ctx, in_c->codec);
-            avcodec_copy_context(ofmt_ctx->streams[i]->codec, in_c);
+            in_c->sample_rate = audio_sample_rate;
+            in_c->frame_size = audio_frame_size;
+            avformat_new_stream(ofmt_ctx, NULL);
+            avcodec_parameters_copy(ofmt_ctx->streams[i]->codecpar, in_c);
             audio_index = i;
         } else if (in_c->codec_id == AV_CODEC_ID_H264) {
-            avformat_new_stream(ofmt_ctx, in_c->codec);
-            avcodec_copy_context(ofmt_ctx->streams[i]->codec, in_c);
+            avformat_new_stream(ofmt_ctx, NULL);
+            avcodec_parameters_copy(ofmt_ctx->streams[i]->codecpar, in_c);
             video_index = i;
         }
     }
 
-    ofmt_ctx->streams[audio_index]->codec->sample_rate = audio_sample_rate;
     ofmt_ctx->streams[audio_index]->codec->frame_size = audio_frame_size;
 
     if (avio_open_dyn_buf(&ofmt_ctx->pb) != 0) {
@@ -409,6 +410,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     }
 
     while (av_read_frame(ifmt_ctx, &pkt) >= 0) {
+        log_packet(ifmt_ctx, &pkt, "in");
         if (pkt.stream_index == audio_index) {
             // The IV must be reset at the beginning of every packet.
             memcpy(packet_iv, s->enc_aes.iv_value, 16);
@@ -416,7 +418,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
             uint8_t *audio_frame = pkt.data;
             uint8_t *p_frame = audio_frame;
 
-            enum AVCodecID cid = ifmt_ctx->streams[audio_index]->codec->codec_id;
+            enum AVCodecID cid = ifmt_ctx->streams[audio_index]->codecpar->codec_id;
             if (cid == AV_CODEC_ID_AAC) {
                 // ADTS headers can contain CRC checks.
                 // If the CRC check bit is 0, CRC exists.
@@ -445,6 +447,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
                 free(dec_tmp);
                 p_frame += 16;
             }
+
             if (av_interleaved_write_frame(ofmt_ctx, &pkt)) {
                 MSG_WARNING("Writing audio frame failed.\n");
             }
@@ -515,7 +518,9 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
                 }
                 p += bytes_remaining(p, nal_end); //unencryted trailer
             }
+
             pkt.size = bytes_remaining(pkt.data, end);
+
             if (av_interleaved_write_frame(ofmt_ctx, &pkt)) {
                 MSG_WARNING("Writing video frame failed.\n");
             }
@@ -617,7 +622,6 @@ int print_enc_keys(struct hls_media_playlist *me)
     }
     return 0;
 }
-
 
 void media_playlist_cleanup(struct hls_media_playlist *me)
 {
