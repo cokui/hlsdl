@@ -410,7 +410,6 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     }
 
     while (av_read_frame(ifmt_ctx, &pkt) >= 0) {
-        log_packet(ifmt_ctx, &pkt, "in");
         if (pkt.stream_index == audio_index) {
             // The IV must be reset at the beginning of every packet.
             memcpy(packet_iv, s->enc_aes.iv_value, 16);
