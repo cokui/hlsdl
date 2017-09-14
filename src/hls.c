@@ -558,11 +558,7 @@ int download_hls(struct hls_media_playlist *me)
 
     char filename[MAX_FILENAME_LEN];
 
-    if (hls_args.custom_filename) {
-        strcpy(filename, hls_args.filename);
-    } else {
-        strcpy(filename, "000_hls_output.ts");
-    }
+    strcpy(filename, hls_args.custom_filename ? hls_args.filename : "0_hlsdl_output.ts");
 
     if (access(filename, F_OK) != -1) {
         if (hls_args.force_overwrite) {
@@ -576,7 +572,7 @@ int download_hls(struct hls_media_playlist *me)
             scanf("\n%c", &userchoice);
             if (userchoice == 'y') {
                 if (remove(filename) != 0) {
-                    MSG_ERROR("Error overwriting file");
+                    MSG_ERROR("Error overwriting file.\n");
                     exit(1);
                 }
             } else {
