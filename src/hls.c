@@ -608,7 +608,7 @@ int print_enc_keys(struct hls_media_playlist *me)
 {
     for (int i = 0; i < me->count; i++) {
         if (me->encryption == true) {
-            MSG_PRINT("[AES-128]KEY: 0x");
+            MSG_PRINT("[AES-128] KEY: 0x");
             for(size_t count = 0; count < KEYLEN; count++) {
                 MSG_PRINT("%02x", me->media_segment[i].enc_aes.key_value[count]);
             }
