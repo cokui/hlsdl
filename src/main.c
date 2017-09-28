@@ -46,11 +46,14 @@ int main(int argc, const char * argv[])
         if (hls_args.use_best) {
             int max = 0;
             for (int i = 0; i < master_playlist.count; i++) {
-                if (master_playlist.media_playlist[i].bitrate > master_playlist.media_playlist[max].bitrate) {
+                if (master_playlist.media_playlist[i].bitrate > 
+                    master_playlist.media_playlist[max].bitrate)
+                {
                     max = i;
                 }
             }
-            MSG_VERBOSE("Choosing best quality. (Bitrate: %d)\n", master_playlist.media_playlist[max].bitrate);
+            MSG_VERBOSE("Choosing best quality. (Bitrate: %d)\n",
+                        master_playlist.media_playlist[max].bitrate);
             quality_choice = max;
         } else {
             print_hls_master_playlist(&master_playlist);
@@ -75,7 +78,8 @@ int main(int argc, const char * argv[])
 
     if (media_playlist.encryption) {
         MSG_PRINT("HLS Stream is %s encrypted.\n",
-                  media_playlist.encryptiontype == ENC_AES128 ? "AES-128" : "SAMPLE-AES");
+                  media_playlist.encryptiontype == ENC_AES128 ? "AES-128" : 
+                                                                "SAMPLE-AES");
     }
 
     MSG_VERBOSE("Media Playlist parsed successfully.\n");

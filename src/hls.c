@@ -85,8 +85,10 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
     char *link_to_key = malloc(strlen(tag) + strlen(me->url) + 10);
     char iv_str[STRLEN_BTS(KEYLEN)];
         
-    if (sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_str) == 2 ||
-        sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_str) == 2)
+    if (sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0x%s",
+        link_to_key, iv_str) == 2 ||
+        sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0x%s",
+        link_to_key, iv_str) == 2)
     {
         uint8_t *iv_bin = malloc(KEYLEN);
         str_to_bin(iv_bin, iv_str, KEYLEN);
@@ -168,11 +170,15 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
             if (sscanf(src, "%[^\n]", ms[i].url) == 1) {
                 ms[i].sequence_number = i + ms_init;
 
-                if (me->encryptiontype == ENC_AES128 || me->encryptiontype == ENC_AES_SAMPLE) {
-                    memcpy(ms[i].enc_aes.key_value, me->enc_aes.key_value, KEYLEN);
+                if (me->encryptiontype == ENC_AES128 ||
+                    me->encryptiontype == ENC_AES_SAMPLE)
+                {
+                    memcpy(ms[i].enc_aes.key_value,
+                           me->enc_aes.key_value, KEYLEN);
                     if (me->enc_aes.iv_is_static == false) {
                         char iv_str[STRLEN_BTS(KEYLEN)];
-                        snprintf(iv_str, STRLEN_BTS(KEYLEN), "%032x\n", ms[i].sequence_number);
+                        snprintf(iv_str, STRLEN_BTS(KEYLEN),
+                                 "%032x\n", ms[i].sequence_number);
                         uint8_t *iv_bin = malloc(KEYLEN);
                         str_to_bin(iv_bin, iv_str, KEYLEN);
                         memcpy(ms[i].enc_aes.iv_value, iv_bin, KEYLEN);
@@ -289,16 +295,19 @@ void print_hls_master_playlist(struct hls_master_playlist *ma)
     }
 }
 
-static int get_info_for_sample_aes(struct ByteBuffer *buf, int *audio_sample_rate, int *audio_frame_size)
+static int get_info_for_sample_aes(struct ByteBuffer *buf,
+                                   int *audio_sample_rate,
+                                   int *audio_frame_size)
 {
     // Insane hack to get the audio sample rate and frame size.
-    int audio_index = -1, video_index = -1;
+    int audio_idx = -1, video_idx = -1;
 
     struct ByteBuffer input_buffer = {buf->data, buf->len, 0};
 
     AVInputFormat *ifmt = av_find_input_format("mpegts");
     uint8_t *input_avbuff = av_malloc(4096);
-    AVIOContext *input_io_ctx = avio_alloc_context(input_avbuff, 4096, 0, &input_buffer,
+    AVIOContext *input_io_ctx = avio_alloc_context(input_avbuff, 4096, 
+                                                   0, &input_buffer,
                                                    read_packet, NULL, seek);
     AVFormatContext *ifmt_ctx = avformat_alloc_context();
     ifmt_ctx->pb = input_io_ctx;
@@ -307,7 +316,8 @@ static int get_info_for_sample_aes(struct ByteBuffer *buf, int *audio_sample_rat
         MSG_ERROR("Opening input file failed\n");
     }
 
-    // avformat_find_stream_info() throws useless warnings because the data is encrypted.
+    // avformat_find_stream_info() throws useless
+    // warnings because the data is encrypted.
     av_log_set_level(AV_LOG_QUIET);
     avformat_find_stream_info(ifmt_ctx, NULL);
     av_log_set_level(AV_LOG_WARNING);
@@ -315,25 +325,26 @@ static int get_info_for_sample_aes(struct ByteBuffer *buf, int *audio_sample_rat
     for (int i = 0; i < (int)ifmt_ctx->nb_streams; i++) {
         AVCodecParameters *in_c = ifmt_ctx->streams[i]->codecpar;
         if (in_c->codec_type == AVMEDIA_TYPE_AUDIO) {
-            audio_index = i;
+            audio_idx = i;
         } else if (in_c->codec_id == AV_CODEC_ID_H264) {
-            video_index = i;
+            video_idx = i;
         }
     }
 
-    if (video_index < 0 || audio_index < 0) {
+    if (video_idx < 0 || audio_idx < 0) {
         MSG_ERROR("Video or Audio missing.");
     }
 
     AVPacket pkt;
 
     while (av_read_frame(ifmt_ctx, &pkt) >= 0) {
-        if (pkt.stream_index == audio_index && *audio_sample_rate == 0) {
+        if (pkt.stream_index == audio_idx && *audio_sample_rate == 0) {
             int idx = (pkt.data[2]) >> 2 & 0xF;
             *audio_sample_rate = sample_rate_lookup[idx][1];
             MSG_DBG("Detected Audio Sample Rate: %d\n", *audio_sample_rate);
 
-            *audio_frame_size = ((pkt.data[3] & 0b11) << 11) | (pkt.data[4] << 3) | (pkt.data[5] >> 5);
+            *audio_frame_size = ((pkt.data[3] & 0b11) << 11) |
+                                (pkt.data[4] << 3) | (pkt.data[5] >> 5);
             MSG_DBG("Detected Audio Frame Size: %d\n", *audio_frame_size);           
         }
         av_packet_unref(&pkt);
@@ -345,13 +356,14 @@ static int get_info_for_sample_aes(struct ByteBuffer *buf, int *audio_sample_rat
     return 0;
 }
 
-static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *buf)
+static int decrypt_sample_aes(struct hls_media_segment *s,
+                              struct ByteBuffer *buf)
 {
     // SAMPLE AES works by encrypting small segments (blocks).
     // Blocks have a size of 16 bytes.
     // Only 1 in 10 blocks of the video stream are encrypted,
     // while every single block of the audio stream is encrypted.
-    int audio_index = -1, video_index = -1;
+    int audio_idx = -1, video_idx = -1;
     static int audio_sample_rate = 0, audio_frame_size = 0;
 
     if (audio_sample_rate == 0) {
@@ -362,7 +374,8 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
 
     AVInputFormat *ifmt = av_find_input_format("mpegts");
     uint8_t *input_avbuff = av_malloc(4096);
-    AVIOContext *input_io_ctx = avio_alloc_context(input_avbuff, 4096, 0, &input_buffer,
+    AVIOContext *input_io_ctx = avio_alloc_context(input_avbuff, 4096,
+                                                   0, &input_buffer,
                                                    read_packet, NULL, seek);
     AVFormatContext *ifmt_ctx = avformat_alloc_context();
     ifmt_ctx->pb = input_io_ctx;
@@ -376,7 +389,8 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
         MSG_ERROR("Opening input file failed\n");
     }
 
-    // avformat_find_stream_info() throws useless warnings because the data is encrypted.
+    // avformat_find_stream_info() throws useless
+    // warnings because the data is encrypted.
     av_log_set_level(AV_LOG_QUIET);
     avformat_find_stream_info(ifmt_ctx, NULL);
     av_log_set_level(AV_LOG_WARNING);
@@ -388,15 +402,15 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
             in_c->frame_size = audio_frame_size;
             avformat_new_stream(ofmt_ctx, NULL);
             avcodec_parameters_copy(ofmt_ctx->streams[i]->codecpar, in_c);
-            audio_index = i;
+            audio_idx = i;
         } else if (in_c->codec_id == AV_CODEC_ID_H264) {
             avformat_new_stream(ofmt_ctx, NULL);
             avcodec_parameters_copy(ofmt_ctx->streams[i]->codecpar, in_c);
-            video_index = i;
+            video_idx = i;
         }
     }
 
-    ofmt_ctx->streams[audio_index]->codec->frame_size = audio_frame_size;
+    ofmt_ctx->streams[audio_idx]->codec->frame_size = audio_frame_size;
 
     if (avio_open_dyn_buf(&ofmt_ctx->pb) != 0) {
         MSG_ERROR("Could not open output memory stream.\n");
@@ -410,14 +424,15 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     }
 
     while (av_read_frame(ifmt_ctx, &pkt) >= 0) {
-        if (pkt.stream_index == audio_index) {
+        if (pkt.stream_index == audio_idx) {
             // The IV must be reset at the beginning of every packet.
             memcpy(packet_iv, s->enc_aes.iv_value, 16);
 
             uint8_t *audio_frame = pkt.data;
             uint8_t *p_frame = audio_frame;
 
-            enum AVCodecID cid = ifmt_ctx->streams[audio_index]->codecpar->codec_id;
+            enum AVCodecID cid = 
+                ifmt_ctx->streams[audio_idx]->codecpar->codec_id;
             if (cid == AV_CODEC_ID_AAC) {
                 // ADTS headers can contain CRC checks.
                 // If the CRC check bit is 0, CRC exists.
@@ -436,7 +451,8 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
 
             while (bytes_remaining(p_frame, (audio_frame + pkt.size)) >= 16 ) {
                 uint8_t *dec_tmp = malloc(16);
-                AES128_CBC_decrypt_buffer(dec_tmp, p_frame, 16, s->enc_aes.key_value, packet_iv);
+                AES128_CBC_decrypt_buffer(dec_tmp, p_frame, 16,
+                                          s->enc_aes.key_value, packet_iv);
 
                 // CBC requires the unencrypted data from the previous
                 // decryption as IV.
@@ -450,7 +466,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
             if (av_interleaved_write_frame(ofmt_ctx, &pkt)) {
                 MSG_WARNING("Writing audio frame failed.\n");
             }
-        } else if (pkt.stream_index == video_index) {
+        } else if (pkt.stream_index == video_idx) {
             // av_return_frame() returns whole h264 frames. SAMPLE-AES
             // encrypts NAL units instead of frames. Fortunatly, a frame
             // contains multiple NAL units, so av_return_frame() can be used.
@@ -481,7 +497,9 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
                     // Remove the start code emulation prevention.
                     for (int i = 0; i < 4; i++) {
                         uint8_t *tmp = p;
-                        while ((tmp = memmem(tmp, nal_end - tmp, h264_scep_search[i], 4))) {
+                        while ((tmp = memmem(tmp, nal_end - tmp,
+                                             h264_scep_search[i], 4)))
+                        {
                             memcpy(tmp, h264_scep_replace[i], 3);
                             tmp += 3;
                             end -= 1;
@@ -502,7 +520,9 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
                     block++;
                     if (block == 1) {
                         uint8_t *output = malloc(16);
-                        AES128_CBC_decrypt_buffer(output, p, 16, s->enc_aes.key_value, packet_iv);
+                        AES128_CBC_decrypt_buffer(output, p, 16, 
+                                                  s->enc_aes.key_value,
+                                                  packet_iv);
 
                         // CBC requires the unencrypted data from the previous
                         // decryption as IV.
@@ -562,7 +582,8 @@ int download_hls(struct hls_media_playlist *me)
 
     char filename[MAX_FILENAME_LEN];
 
-    strcpy(filename, hls_args.custom_filename ? hls_args.filename : "0_hlsdl_output.ts");
+    strcpy(filename, hls_args.custom_filename ? hls_args.filename :
+                                                "0_hlsdl_output.ts");
 
     if (access(filename, F_OK) != -1) {
         if (hls_args.force_overwrite) {
@@ -591,10 +612,13 @@ int download_hls(struct hls_media_playlist *me)
     for (int i = 0; i < me->count; i++) {
         MSG_PRINT("Downloading part %d\n", i);
         struct ByteBuffer seg;
-        seg.len = (int)get_data_from_url(me->media_segment[i].url, NULL, &(seg.data), BINARY);
+        seg.len = (int)get_data_from_url(me->media_segment[i].url,
+                                         NULL, &(seg.data), BINARY);
         if (me->encryption == true && me->encryptiontype == ENC_AES128) {
             decrypt_aes128(&me->media_segment[i], &seg);
-        } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
+        } else if (me->encryption == true &&
+                   me->encryptiontype == ENC_AES_SAMPLE)
+        {
             decrypt_sample_aes(&me->media_segment[i], &seg);
         }
         fwrite(seg.data, 1, seg.len, p_file);
@@ -609,11 +633,12 @@ int print_enc_keys(struct hls_media_playlist *me)
     for (int i = 0; i < me->count; i++) {
         if (me->encryption == true) {
             MSG_PRINT("[AES-128] KEY: 0x");
-            for(size_t count = 0; count < KEYLEN; count++) {
-                MSG_PRINT("%02x", me->media_segment[i].enc_aes.key_value[count]);
+            for (size_t count = 0; count < KEYLEN; count++) {
+                MSG_PRINT("%02x",
+                          me->media_segment[i].enc_aes.key_value[count]);
             }
             MSG_PRINT(" IV: 0x");
-            for(size_t count = 0; count < KEYLEN; count++) {
+            for (size_t count = 0; count < KEYLEN; count++) {
                 MSG_PRINT("%02x", me->media_segment[i].enc_aes.iv_value[count]);
             }
             MSG_PRINT("\n");
