@@ -7,17 +7,16 @@ INSTALL_DIR=$(PREFIX)/bin
 S_SRC= src/main.c src/aes.c src/curl.c src/hls.c src/misc.c src/msg.c	
 S_OBJS=	$(S_SRC:.c=.o)
 
+PKGCONFIG= pkg-config libcurl libavformat libavutil libavcodec
 CFLAGS+=-Wall -Wstrict-prototypes -Wmissing-prototypes
 CFLAGS+=-Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-qual
 CFLAGS+=-Wsign-compare -Iincludes -g
 CFLAGS+=-DPREFIX='"$(PREFIX)"'
-LDFLAGS+=-lcurl -lavformat -lavutil -lavcodec
+CFLAGS+=$(shell $(PKGCONFIG) --cflags)
+LDFLAGS=$(shell $(PKGCONFIG) --libs)
 
 OSNAME=$(shell uname -s | sed -e 's/[-_].*//g' | tr A-Z a-z)
-ifeq ("$(OSNAME)", "darwin")
-	CFLAGS+=-I/usr/local/include/
-	LDFLAGS+=-L/usr/local/lib
-else ifeq ("$(OSNAME)", "linux")
+ifeq ("$(OSNAME)", "linux")
 	CFLAGS+=-D_GNU_SOURCE=1 -std=gnu99
 else
 endif
