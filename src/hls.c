@@ -160,7 +160,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
     }
     
     for (int i = 0; i < me->count; i++) {
-        while ((src = (strchr(src, '\n')))) {
+        while (src && (src = (strchr(src, '\n')))) {
             src++;
             if (*src == '\n') {
                 continue;
