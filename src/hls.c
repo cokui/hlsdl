@@ -90,9 +90,9 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
     char *link_to_key = malloc(strlen(tag) + strlen(me->url) + 10);
     char iv_str[STRLEN_BTS(KEYLEN)];
         
-    if (sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0x%s",
+    if (sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0x%32[0-9a-f]",
         link_to_key, iv_str) == 2 ||
-        sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0x%s",
+        sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0x%32[0-9a-f]",
         link_to_key, iv_str) == 2)
     {
         uint8_t *iv_bin = malloc(KEYLEN);
