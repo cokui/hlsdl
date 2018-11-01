@@ -1,3 +1,6 @@
+https://github.com/samsamsam-iptvplayer/hlsdl is fork that is under active development.
+-----
+
 hlsdl
 =====
 
